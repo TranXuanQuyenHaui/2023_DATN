@@ -1,15 +1,24 @@
 package com.example.distancetrackerapp.ui.maps
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import androidx.fragment.app.Fragment
 import android.os.Bundle
 import android.os.CountDownTimer
+import android.util.Log
+
 import android.view.LayoutInflater
+
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
+import android.widget.Toast
+
 import androidx.core.content.ContextCompat
+
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
@@ -28,6 +37,7 @@ import com.example.distancetrackerapp.util.ExtensionFunctions.hide
 import com.example.distancetrackerapp.util.ExtensionFunctions.show
 import com.example.distancetrackerapp.util.Permissions.hasBackgroundLocationPermission
 import com.example.distancetrackerapp.util.Permissions.requestBackgroundLocationPermission
+
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -35,16 +45,28 @@ import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.*
+
 import com.vmadalin.easypermissions.EasyPermissions
 import com.vmadalin.easypermissions.dialogs.SettingsDialog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.appcompat.widget.SearchView
+// Specify the full path to the Place class
+
+import com.google.android.gms.maps.model.LatLng
+import com.google.android.material.snackbar.Snackbar
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
 
 class MapsFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnMyLocationButtonClickListener,
     GoogleMap.OnMarkerClickListener, EasyPermissions.PermissionCallbacks {
 
     private var _binding: FragmentMapsBinding? = null
     private val binding get() = _binding!!
+
 
     private lateinit var map: GoogleMap
 
@@ -58,6 +80,73 @@ class MapsFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnMyLocationButto
     private var markerList = mutableListOf<Marker>()
 
     private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
+
+//search
+
+
+    private fun searchLocation(query: String?) {
+        // Kiểm tra xem query có giá trị không
+        if (!query.isNullOrBlank()) {
+            // Gọi hàm xử lý tìm kiếm vị trí
+            performSearch(query)
+        }
+    }
+//
+
+    private fun performSearch(query: String) {
+        // Gọi API để lấy thông tin vị trí từ địa chỉ
+        val apiKey = "AIzaSyA5mwYQHUUqbWCUEV4xNpwkbu8--GHf1NU"
+        val geocodingService = GeocodingService.create()
+
+        val callback = object : Callback<GeocodingResponse?> {
+            override fun onResponse(call: Call<GeocodingResponse?>, response: Response<GeocodingResponse?>) {
+                if (response.isSuccessful) {
+                    val geocodingResponse = response.body()
+                    geocodingResponse?.let {
+                        handleGeocodingResponse(it)
+
+                    }
+                } else {
+                    Log.e("GeocodingService", "API Error: ${response.code()}")
+                }
+            }
+
+            override fun onFailure(call: Call<GeocodingResponse?>, t: Throwable) {
+                // Xử lý khi có lỗi trong quá trình gọi API
+            }
+        }
+
+        // Gọi API với callback đã tạo
+        geocodingService.getLocationByAddress(query, apiKey).enqueue(callback)
+    }
+
+    private fun showToast(message: String) {
+        Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
+    }
+    private fun handleGeocodingResponse(geocodingResponse: GeocodingResponse) {
+        // Lấy thông tin vị trí từ response và xử lý
+        if (geocodingResponse.results.isNotEmpty()) {
+            val location = geocodingResponse.results[0].geometry.location
+            val targetLocation = LatLng(location.lat, location.lng)
+            val formattedAddress = geocodingResponse.results[0].formattedAddress
+
+            // Thực hiện các xử lý bạn muốn với vị trí nhận được (ví dụ: di chuyển đến vị trí trên bản đồ)
+            moveCameraToLocation(targetLocation)
+            showToast("Location found: $formattedAddress")
+
+        } else {
+            Snackbar.make(binding.root, "Location not found.", Snackbar.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun moveCameraToLocation(targetLocation: LatLng) {
+        // Thực hiện di chuyển đến vị trí trên bản đồ
+        map.animateCamera(CameraUpdateFactory.newLatLngZoom(targetLocation, 15f))
+    }
+//
+
+
+
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -77,17 +166,37 @@ class MapsFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnMyLocationButto
         binding.resetButton.setOnClickListener {
             onResetButtonClicked()
         }
+        binding.searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String?): Boolean {
+                // on below line we are checking
+                // if query exist or not.
+                searchLocation(query)
+                return false
+            }
 
+            override fun onQueryTextChange(newText: String?): Boolean {
+                // if query text is change in that case we
+                // are filtering our adapter with
+                // new text on below line.
+//                listAdapter.filter.filter(newText)
+                return false
+            }
+        })
         fusedLocationProviderClient =
             LocationServices.getFusedLocationProviderClient(requireActivity())
 
+
+
         return binding.root
     }
+
+
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         val mapFragment = childFragmentManager.findFragmentById(R.id.map) as SupportMapFragment?
         mapFragment?.getMapAsync(this)
+
     }
 
     @SuppressLint("MissingPermission", "PotentialBehaviorOverride")
@@ -97,12 +206,12 @@ class MapsFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnMyLocationButto
         map.setOnMyLocationButtonClickListener(this)
         map.setOnMarkerClickListener(this)
         map.uiSettings.apply {
-            isZoomControlsEnabled = false
-            isZoomGesturesEnabled = false
-            isRotateGesturesEnabled = false
-            isTiltGesturesEnabled = false
-            isCompassEnabled = false
-            isScrollGesturesEnabled = false
+            isZoomControlsEnabled = true
+            isZoomGesturesEnabled = true
+            isRotateGesturesEnabled = true
+            isTiltGesturesEnabled = true
+            isCompassEnabled = true
+            isScrollGesturesEnabled = true
         }
         observeTrackerService()
     }
@@ -307,7 +416,7 @@ class MapsFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnMyLocationButto
         permissions: Array<out String>,
         grantResults: IntArray
     ) {
-//        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        //super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         EasyPermissions.onRequestPermissionsResult(requestCode, permissions, grantResults, this)
     }
 
@@ -331,6 +440,8 @@ class MapsFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnMyLocationButto
     override fun onMarkerClick(p0: Marker): Boolean {
         return true
     }
+
+
 }
 
 
