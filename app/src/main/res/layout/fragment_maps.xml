@@ -24,20 +24,42 @@
             tools:layout_editor_absoluteX="0dp"
             tools:layout_editor_absoluteY="-50dp" />
 
-        <androidx.appcompat.widget.SearchView
-            android:id="@+id/search_view"
-            android:hint="@string/search"
-            android:layout_width="300dp"
-            android:layout_height="wrap_content"
 
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintHorizontal_bias="0.495"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintVertical_bias="0.036">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal">
 
-        </androidx.appcompat.widget.SearchView>
+            <EditText
+                android:id="@+id/edit_text"
+                android:layout_width="8dp"
+                android:layout_height="50dp"
+                android:layout_weight="1"
+                android:hint="Search Location"
+                android:inputType="textPersonName"
+                android:textColor="@color/white" />
+
+            <Button
+                android:id="@+id/search"
+                android:layout_width="wrap_content"
+                android:layout_height="50dp"
+                android:text="Tìm kiếm"
+
+                android:textColor="@color/white"
+                android:translationX="-50dp" />
+
+            <Button
+                android:id="@+id/find_dis"
+                android:layout_width="wrap_content"
+                android:layout_height="50dp"
+                android:text="Tìm Đường"
+
+                android:textColor="@color/white"
+                android:translationX="-50dp" />
+
+
+        </LinearLayout>
+
 
         <TextView
             android:id="@+id/timer_textView"
@@ -106,26 +128,6 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintHorizontal_bias="0.5"
             app:layout_constraintStart_toStartOf="parent" />
-
-<!--        <?xml version="1.0" encoding="utf-8"?>-->
-<!--        <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"-->
-<!--            xmlns:app="http://schemas.android.com/apk/res-auto"-->
-<!--            xmlns:tools="http://schemas.android.com/tools"-->
-<!--            android:layout_width="match_parent"-->
-<!--            android:layout_height="match_parent"-->
-<!--            tools:context=".MainActivity">-->
-
-<!--            <SearchView-->
-<!--                android:id="@+id/searchView"-->
-<!--                android:layout_width="match_parent"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:iconifiedByDefault="false" />-->
-
-<!--             Other layout elements can be added below the SearchView -->
-
-<!--        </RelativeLayout>-->
-
-
 
 
 

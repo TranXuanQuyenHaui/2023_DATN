@@ -1,9 +1,11 @@
 package com.example.distancetrackerapp.ui.maps
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.location.Address
+import android.location.Geocoder
+import android.os.AsyncTask
 import androidx.fragment.app.Fragment
 import android.os.Bundle
 import android.os.CountDownTimer
@@ -13,11 +15,14 @@ import android.view.LayoutInflater
 
 import android.view.View
 import android.view.ViewGroup
-import android.view.inputmethod.EditorInfo
-import android.view.inputmethod.InputMethodManager
+import android.widget.EditText
 import android.widget.Toast
 
 import androidx.core.content.ContextCompat
+
+
+import com.google.android.gms.maps.model.MarkerOptions
+import com.google.android.gms.maps.model.PolylineOptions
 
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.lifecycleScope
@@ -50,24 +55,21 @@ import com.vmadalin.easypermissions.EasyPermissions
 import com.vmadalin.easypermissions.dialogs.SettingsDialog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import androidx.appcompat.widget.SearchView
 // Specify the full path to the Place class
 
 import com.google.android.gms.maps.model.LatLng
-import com.google.android.material.snackbar.Snackbar
-import com.google.android.material.textfield.TextInputEditText
-import com.google.android.material.textfield.TextInputLayout
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
+import com.google.gson.Gson
+import com.squareup.okhttp.OkHttpClient
+import com.squareup.okhttp.Request
+import java.io.IOException
 
 class MapsFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnMyLocationButtonClickListener,
     GoogleMap.OnMarkerClickListener, EasyPermissions.PermissionCallbacks {
 
     private var _binding: FragmentMapsBinding? = null
     private val binding get() = _binding!!
-
-
+    private var locationSearch: EditText? = null
+    private var findlocation: LatLng? = null
     private lateinit var map: GoogleMap
 
     val started = MutableLiveData(false)
@@ -80,70 +82,10 @@ class MapsFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnMyLocationButto
     private var markerList = mutableListOf<Marker>()
 
     private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
+    private var location1 = LatLng(21.0537, 105.7351)
 
-//search
+    private var location2 = LatLng(21.0524, 105.7408)
 
-
-    private fun searchLocation(query: String?) {
-        // Kiểm tra xem query có giá trị không
-        if (!query.isNullOrBlank()) {
-            // Gọi hàm xử lý tìm kiếm vị trí
-            performSearch(query)
-        }
-    }
-//
-
-    private fun performSearch(query: String) {
-        // Gọi API để lấy thông tin vị trí từ địa chỉ
-        val apiKey = "AIzaSyA5mwYQHUUqbWCUEV4xNpwkbu8--GHf1NU"
-        val geocodingService = GeocodingService.create()
-
-        val callback = object : Callback<GeocodingResponse?> {
-            override fun onResponse(call: Call<GeocodingResponse?>, response: Response<GeocodingResponse?>) {
-                if (response.isSuccessful) {
-                    val geocodingResponse = response.body()
-                    geocodingResponse?.let {
-                        handleGeocodingResponse(it)
-
-                    }
-                } else {
-                    Log.e("GeocodingService", "API Error: ${response.code()}")
-                }
-            }
-
-            override fun onFailure(call: Call<GeocodingResponse?>, t: Throwable) {
-                // Xử lý khi có lỗi trong quá trình gọi API
-            }
-        }
-
-        // Gọi API với callback đã tạo
-        geocodingService.getLocationByAddress(query, apiKey).enqueue(callback)
-    }
-
-    private fun showToast(message: String) {
-        Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
-    }
-    private fun handleGeocodingResponse(geocodingResponse: GeocodingResponse) {
-        // Lấy thông tin vị trí từ response và xử lý
-        if (geocodingResponse.results.isNotEmpty()) {
-            val location = geocodingResponse.results[0].geometry.location
-            val targetLocation = LatLng(location.lat, location.lng)
-            val formattedAddress = geocodingResponse.results[0].formattedAddress
-
-            // Thực hiện các xử lý bạn muốn với vị trí nhận được (ví dụ: di chuyển đến vị trí trên bản đồ)
-            moveCameraToLocation(targetLocation)
-            showToast("Location found: $formattedAddress")
-
-        } else {
-            Snackbar.make(binding.root, "Location not found.", Snackbar.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun moveCameraToLocation(targetLocation: LatLng) {
-        // Thực hiện di chuyển đến vị trí trên bản đồ
-        map.animateCamera(CameraUpdateFactory.newLatLngZoom(targetLocation, 15f))
-    }
-//
 
 
 
@@ -166,30 +108,33 @@ class MapsFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnMyLocationButto
         binding.resetButton.setOnClickListener {
             onResetButtonClicked()
         }
-        binding.searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
-            override fun onQueryTextSubmit(query: String?): Boolean {
-                // on below line we are checking
-                // if query exist or not.
-                searchLocation(query)
-                return false
-            }
 
-            override fun onQueryTextChange(newText: String?): Boolean {
-                // if query text is change in that case we
-                // are filtering our adapter with
-                // new text on below line.
-//                listAdapter.filter.filter(newText)
-                return false
-            }
-        })
         fusedLocationProviderClient =
             LocationServices.getFusedLocationProviderClient(requireActivity())
 
 
-
+        locationSearch = binding.editText
+        binding.search.setOnClickListener {
+            onSearchButtonClicked()
+        }
+//        binding.findDis.setOnClickListener {
+//            onGetDistanceClicked()
+//        }
         return binding.root
     }
 
+//    private fun onGetDistanceClicked() {
+//       if(findlocation!=null){
+//           map.addMarker(MarkerOptions().position(location1))
+//           map.addMarker(MarkerOptions().position(location2))
+//           findDirection(location1, location2)
+//           decodePolyline("context")
+//       }
+//    }
+
+    private fun onSearchButtonClicked(){
+        searchLocation()
+    }
 
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -295,6 +240,7 @@ class MapsFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnMyLocationButto
         binding.timerTextView.show()
         binding.stopButton.disable()
         val timer: CountDownTimer = object : CountDownTimer(4000, 1000) {
+            @SuppressLint("SetTextI18n")
             override fun onTick(millisUntilFinished: Long) {
                 val currentSecond = millisUntilFinished / 1000
                 if (currentSecond.toString() == "0") {
@@ -440,6 +386,132 @@ class MapsFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnMyLocationButto
     override fun onMarkerClick(p0: Marker): Boolean {
         return true
     }
+
+    //Search
+    private fun searchLocation(){
+
+        val location: String = locationSearch?.text.toString().trim()
+        var addressList: List<Address>? = null
+
+        if (location == ""){
+            Toast.makeText(context, "Phải nhập địa điểm trước", Toast.LENGTH_SHORT).show()
+        }else{
+
+            val geoCoder = context?.let { Geocoder(it) }
+            try {
+                if (geoCoder != null) {
+                    addressList = geoCoder.getFromLocationName(location, 1)
+                }
+            }catch (e: IOException){
+                e.printStackTrace()
+            }
+            if (addressList != null) {
+                if(addressList.isNotEmpty()){
+                val address = addressList[0]
+                val latLng = LatLng(address.latitude, address.longitude)
+                map.addMarker(MarkerOptions().position(latLng).title(location))
+                map.animateCamera(CameraUpdateFactory.newLatLng(latLng))
+                    //latLng?.clear()
+                    findlocation = latLng
+                }
+
+                else
+                    Toast.makeText(context, "Không tìm thấy địa điểm", Toast.LENGTH_SHORT).show()
+            }
+
+        }
+    }
+
+    private fun findDirection(start: LatLng, end: LatLng){
+        val urlDirection = getDirectionURL(start,end)
+        GetDirection(urlDirection).execute()
+    }
+
+    private fun getDirectionURL(origin: LatLng, dest:LatLng) : String{
+        return "https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude}," +
+                "${origin.longitude}&destination=${dest.latitude},${dest.longitude}&sensor=false&mode=driving"
+    }
+    @SuppressLint("StaticFieldLeak")
+    private inner class GetDirection(val url : String) : AsyncTask<Void,Void,List<List<LatLng>>>(){
+        @Deprecated("Deprecated in Java")
+        override fun doInBackground(vararg params: Void?): List<List<LatLng>> {
+            val client = OkHttpClient()
+            val request = Request.Builder().url(url).build()
+            val response = client.newCall(request).execute()
+            val data = response.body()!!.string()
+            Log.d("GoogleMap" , " data : $data")
+            val result =  ArrayList<List<LatLng>>()
+            try{
+                val respObj = Gson().fromJson(data,GoogleMapDTO::class.java)
+
+                val path =  ArrayList<LatLng>()
+
+                for (i in 0 until respObj.routes[0].legs[0].steps.size){
+//                    val startLatLng = LatLng(respObj.routes[0].legs[0].steps[i].start_location.lat.toDouble()
+//                            ,respObj.routes[0].legs[0].steps[i].start_location.lng.toDouble())
+//                    path.add(startLatLng)
+//                    val endLatLng = LatLng(respObj.routes[0].legs[0].steps[i].end_location.lat.toDouble()
+//                            ,respObj.routes[0].legs[0].steps[i].end_location.lng.toDouble())
+                    path.addAll(decodePolyline(respObj.routes[0].legs[0].steps[i].polyline.points))
+                }
+                result.add(path)
+            }catch (e:Exception){
+                e.printStackTrace()
+            }
+            return result
+        }
+
+        @Deprecated("Deprecated in Java")
+        override fun onPostExecute(result: List<List<LatLng>>) {
+            val lineoption = PolylineOptions()
+            for (i in result.indices){
+                lineoption.addAll(result[i])
+                lineoption.width(10f)
+                lineoption.color(Color.BLUE)
+                lineoption.geodesic(true)
+            }
+            map.addPolyline(lineoption)
+        }
+    }
+//Draw line
+    public fun decodePolyline(encoded: String): List<LatLng> {
+
+        val poly = ArrayList<LatLng>()
+        var index = 0
+        val len = encoded.length
+        var lat = 0
+        var lng = 0
+
+        while (index < len) {
+            var b: Int
+            var shift = 0
+            var result = 0
+            do {
+                b = encoded[index++].toInt() - 63
+                result = result or (b and 0x1f shl shift)
+                shift += 5
+            } while (b >= 0x20)
+            val dlat = if (result and 1 != 0) (result shr 1).inv() else result shr 1
+            lat += dlat
+
+            shift = 0
+            result = 0
+            do {
+                b = encoded[index++].toInt() - 63
+                result = result or (b and 0x1f shl shift)
+                shift += 5
+            } while (b >= 0x20)
+            val dlng = if (result and 1 != 0) (result shr 1).inv() else result shr 1
+            lng += dlng
+
+            val latLng = LatLng((lat.toDouble() / 1E5),(lng.toDouble() / 1E5))
+            poly.add(latLng)
+        }
+
+        return poly
+    }
+
+
 
 
 }
